@@ -92,13 +92,8 @@ int colocated_token_definitions(struct token_definition **_tokens, size_t *_n)
 		after_tokens += n + 1;
 
 		token.regexp = after_tokens;
-		*after_tokens++ = '\\';
-		*after_tokens++ = 'b';
-		memcpy(after_tokens, keywords[i], n);
-		after_tokens += n;
-		*after_tokens++ = '\\';
-		*after_tokens++ = 'b';
-		*after_tokens++ = '\0';
+		sprintf(after_tokens, "\\b%s\\b", keywords[i]);
+		after_tokens += n + 5;
 
 		*tokens++ = token;
 	}
