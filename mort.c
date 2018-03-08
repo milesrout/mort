@@ -44,7 +44,7 @@ void init_tokens(struct token_definition **_tokens)
 	tokens[7] = (struct token_definition){"if",      nfa_string("if")};
 	tokens[8] = (struct token_definition){"else",    nfa_string("else")};
 	tokens[9] = (struct token_definition){"return",  nfa_string("return")};
-	tokens[10] = (struct token_definition){"ident",   nfa_concatenation(nfa_symbol(alpha), nfa_kleene_star(nfa_symbol(alnum)))};
+	tokens[10] = (struct token_definition){"ident",  nfa_concatenation(nfa_symbol(alpha), nfa_kleene_star(nfa_symbol(alnum)))};
 
 	*_tokens = tokens;
 }
@@ -89,7 +89,7 @@ escape(char c)
 	return onechar(c);
 }
 
-size_t simulate(struct nfa_graph *graph, FILE *stream)
+off_t simulate(struct nfa_graph *graph, FILE *stream)
 {
 	int c = '\0';
 	int i = 0;
@@ -105,13 +105,13 @@ size_t simulate(struct nfa_graph *graph, FILE *stream)
 	while ((c = fgetc(stream)) != EOF) {
 		count += 1;
 
-		tracef(" - c:'%s'", escape(c));
-		trace_statelist("c", current);
+		// tracef(" - c:'%s'", escape(c));
+		// trace_statelist("c", current);
 		for (i = 0; i < current->num_states; i++) {
 			struct nfa_state *s = current->states[i];
 			nfa_statelist_pushmatching(next, s, (char)c);
 		}
-		trace_statelist("n", next);
+		// trace_statelist("n", next);
 
 		if (next->num_states == 0) {
 			break;

@@ -301,35 +301,26 @@ void
 nfa_statelist_pushclosure(struct nfa_statelist *list, struct nfa_state *s)
 {
 	nfa_statelist_push(list, s);
-	if (s->trans1.endpoint != NULL && s->trans1.valid == NULL) {
-		if (!nfa_statelist_contains(list, s->trans1.endpoint)) {
+	if (s->trans1.endpoint != NULL && s->trans1.valid == NULL)
+		if (!nfa_statelist_contains(list, s->trans1.endpoint))
 			nfa_statelist_pushclosure(list, s->trans1.endpoint);
-		}
-	}
-	if (s->trans2.endpoint != NULL && s->trans2.valid == NULL) {
-		if (!nfa_statelist_contains(list, s->trans2.endpoint)) {
+	if (s->trans2.endpoint != NULL && s->trans2.valid == NULL)
+		if (!nfa_statelist_contains(list, s->trans2.endpoint))
 			nfa_statelist_pushclosure(list, s->trans2.endpoint);
-		}
-	}
 }
 
 void
 nfa_statelist_pushmatching(struct nfa_statelist *list, struct nfa_state *s, char c)
 {
-	if (s->trans1.endpoint != NULL && s->trans1.valid != NULL) {
-		if (strchr(s->trans1.valid, c) != NULL) {
-			if (!nfa_statelist_contains(list, s->trans1.endpoint)) {
+	if (s->trans1.endpoint != NULL && s->trans1.valid != NULL)
+		if (strchr(s->trans1.valid, c) != NULL)
+			if (!nfa_statelist_contains(list, s->trans1.endpoint))
 				nfa_statelist_pushclosure(list, s->trans1.endpoint);
-			}
-		}
-	}
-	if (s->trans2.endpoint != NULL && s->trans2.valid != NULL) {
-		if (strchr(s->trans2.valid, c) != NULL) {
-			if (!nfa_statelist_contains(list, s->trans2.endpoint)) {
+
+	if (s->trans2.endpoint != NULL && s->trans2.valid != NULL)
+		if (strchr(s->trans2.valid, c) != NULL)
+			if (!nfa_statelist_contains(list, s->trans2.endpoint))
 				nfa_statelist_pushclosure(list, s->trans2.endpoint);
-			}
-		}
-	}
 }
 
 struct nfa_statelist *
