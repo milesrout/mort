@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +23,7 @@ static char *twochar(char c, char d)
 {
 	char *s = emalloc(3);
 	s[0] = c;
-	s[1] = c;
+	s[1] = d;
 	s[2] = '\0';
 	return s;
 }
@@ -38,9 +39,9 @@ _(const char *string)
 		return twochar('\xCE', '\xb5');
 	}
 	
-	p = new = malloc(2 * strlen(string) + 1);
+	p = new = emalloc(2 * strlen(string) + 1);
 
-	for (i = 0; i < strlen(string); i++) {
+	for (i = 0; string[i] != '\0'; i++) {
 		if (string[i] == '\n') {
 			*p++ = '\\';
 			*p++ = 'n';
@@ -56,7 +57,31 @@ _(const char *string)
 	}
 	*p++ = '\0';
 
-	return realloc(new, strlen(new) + 1);
+	return erealloc(new, strlen(new) + 1);
+}
+
+struct nfa_graph *
+nfa_no(void)
+{
+	struct nfa_state *f, *q;
+	struct nfa_graph *g;
+
+	f = emalloc(sizeof *f);
+	asprintf(&f->name, "(nil-f)");
+	f->trans1.endpoint = NULL;
+	f->trans2.endpoint = NULL;
+
+	q = emalloc(sizeof *q);
+	asprintf(&q->name, "(nil-q)");
+	q->trans1.endpoint = NULL;
+	q->trans2.endpoint = NULL;
+
+	g = emalloc(sizeof *g);
+	asprintf(&g->name, "(nil-g)");
+	g->initial_state = q;
+	g->final_state = f;
+
+	return g;
 }
 
 struct nfa_graph *
@@ -120,35 +145,6 @@ nfa_string(const char *string)
 	graph->final_state = state;
 
 	return graph;
-}
-
-static int isword(int ch)
-{
-	return ch == '_' || isalnum(ch);
-}
-
-static int is_word_boundary(const char *input, size_t index, size_t length)
-{
-	if (index > length) {
-		fprintf(stderr, "Invalid index: %lu, should be in [0,%lu)\n", index, length);
-		abort();
-	}
-
-	if (index == length) {
-		return isword(input[index - 1]);
-	}
-
-	if (index == 0 || index == length - 1)
-		if (isword(input[index]))
-			return 1;
-
-	if (index < length - 1 && isword(input[index]) != isword(input[index + 1]))
-		return 1;
-
-	if (index > 0 && isword(input[index]) != isword(input[index - 1]))
-		return 1;
-
-	return 0;
 }
 
 struct nfa_graph *
@@ -280,7 +276,7 @@ nfa_statelist_expand(struct nfa_statelist *list)
 int
 nfa_statelist_contains(struct nfa_statelist *list, struct nfa_state *s)
 {
-	for (size_t i = 0; i < list->num_states; i++)
+	for (ptrdiff_t i = 0; i < list->num_states; i++)
 		if (list->states[i] == s)
 			return 1;
 	return 0;
@@ -293,8 +289,7 @@ nfa_statelist_push(struct nfa_statelist *list, struct nfa_state *s)
 		nfa_statelist_expand(list);
 	}
 
-	list->states[list->num_states] = s;
-	list->num_states++;
+	list->states[list->num_states++] = s;
 }
 
 void
@@ -326,9 +321,9 @@ nfa_statelist_pushmatching(struct nfa_statelist *list, struct nfa_state *s, char
 struct nfa_statelist *
 nfa_statelist_new(void)
 {
-	struct nfa_statelist *list = malloc(sizeof *list);
+	struct nfa_statelist *list = emalloc(sizeof *list);
 
-	list->states = malloc(sizeof(struct nfa_state *));
+	list->states = emalloc(sizeof(struct nfa_state *));
 	list->num_states = 0;
 	list->capacity = 1;
 

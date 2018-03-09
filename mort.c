@@ -1,12 +1,15 @@
-#include <unistd.h>
+#define _GNU_SOURCE
 #include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "util.h"
 
+#include "tok.h"
 #include "nfa.h"
 
 // The scanner, parser, etc. have a 'pull' structure. Rather than reading the
@@ -14,43 +17,29 @@
 // of the file, the file is tokenised lazily as the tokens are required by the
 // parser.
 
-struct token {
-	int   type;
-	char *string;
-	char *filename;
-	int   line;
-	int   col;
-};
-
 const char *alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
 const char *alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 
-struct token_definition {
-	char *name;
-	struct nfa_graph *pattern;
-};
-
-#define NUM_TOKENS 11
-void init_tokens(struct token_definition **_tokens)
+void init_tokens(struct tok_defn **_tokens)
 {
-	struct token_definition *tokens = malloc(NUM_TOKENS * (sizeof *tokens));
-	tokens[0] = (struct token_definition){"lparen",  nfa_symbol("(")};
-	tokens[1] = (struct token_definition){"rparen",  nfa_symbol(")")};
-	tokens[2] = (struct token_definition){"lbrace",  nfa_symbol("{")};
-	tokens[3] = (struct token_definition){"rbrace",  nfa_symbol("}")};
-	tokens[4] = (struct token_definition){"lbrack",  nfa_symbol("[")};
-	tokens[5] = (struct token_definition){"rbrack",  nfa_symbol("]")};
-	tokens[6] = (struct token_definition){"newline", nfa_symbol("\n")};
-	tokens[7] = (struct token_definition){"if",      nfa_string("if")};
-	tokens[8] = (struct token_definition){"else",    nfa_string("else")};
-	tokens[9] = (struct token_definition){"return",  nfa_string("return")};
-	tokens[10] = (struct token_definition){"ident",  nfa_concatenation(nfa_symbol(alpha), nfa_kleene_star(nfa_symbol(alnum)))};
+	struct tok_defn *tokens = emalloc(NUM_TOKENS * (sizeof *tokens));
+	tokens[TOKEN_EOF]     = (struct tok_defn){TOKEN_EOF,     nfa_no()};
+	tokens[TOKEN_LPAREN]  = (struct tok_defn){TOKEN_LPAREN,  nfa_symbol("(")};
+	tokens[TOKEN_RPAREN]  = (struct tok_defn){TOKEN_RPAREN,  nfa_symbol(")")};
+	tokens[TOKEN_LBRACE]  = (struct tok_defn){TOKEN_LBRACE,  nfa_symbol("{")};
+	tokens[TOKEN_RBRACE]  = (struct tok_defn){TOKEN_RBRACE,  nfa_symbol("}")};
+	tokens[TOKEN_LBRACK]  = (struct tok_defn){TOKEN_LBRACK,  nfa_symbol("[")};
+	tokens[TOKEN_RBRACK]  = (struct tok_defn){TOKEN_RBRACK,  nfa_symbol("]")};
+	tokens[TOKEN_NEWLINE] = (struct tok_defn){TOKEN_NEWLINE, nfa_symbol("\n")};
+	tokens[TOKEN_IF]      = (struct tok_defn){TOKEN_IF,      nfa_string("if")};
+	tokens[TOKEN_ELSE]    = (struct tok_defn){TOKEN_ELSE,    nfa_string("else")};
+	tokens[TOKEN_RETURN]  = (struct tok_defn){TOKEN_RETURN,  nfa_string("return")};
+	tokens[TOKEN_IDENT]   = (struct tok_defn){TOKEN_IDENT,   nfa_concatenation(nfa_symbol(alpha), nfa_kleene_star(nfa_symbol(alnum)))};
 
 	*_tokens = tokens;
 }
 
-static char *
-onechar(char c)
+static char *onechar(char c)
 {
 	char *s = emalloc(2);
 	s[0] = c;
@@ -77,8 +66,38 @@ static char *threechar(char c, char d, char e)
 	return s;
 }
 
-static char *
-escape(char c)
+static char *escapes(const char *string)
+{
+	ptrdiff_t i;
+	char *p;
+	char *new;
+
+	if (string == NULL) {
+		return twochar('\xCE', '\xb5');
+	}
+
+	p = new = emalloc(2 * strlen(string) + 1);
+
+	for (i = 0; string[i] != '\0'; i++) {
+		if (string[i] == '\n') {
+			*p++ = '\\';
+			*p++ = 'n';
+		} else if (string[i] == '\t') {
+			*p++ = '\\';
+			*p++ = 't';
+		} else {
+			if (strchr("\"\\", string[i]) != NULL) {
+				*p++ = '\\';
+			}
+			*p++ = string[i];
+		}
+	}
+	*p++ = '\0';
+
+	return erealloc(new, strlen(new) + 1);
+}
+
+static char *escape(char c)
 {
 	if (c == '\n') {
 		return twochar('\\', 'n');
@@ -92,7 +111,7 @@ escape(char c)
 off_t simulate(struct nfa_graph *graph, FILE *stream)
 {
 	int c = '\0';
-	int i = 0;
+	ptrdiff_t i = 0;
 	int count = 0;
 	int has_matched = 0;
 	int matched_count = -1;
@@ -107,9 +126,8 @@ off_t simulate(struct nfa_graph *graph, FILE *stream)
 
 		// tracef(" - c:'%s'", escape(c));
 		// trace_statelist("c", current);
-		for (i = 0; i < current->num_states; i++) {
-			struct nfa_state *s = current->states[i];
-			nfa_statelist_pushmatching(next, s, (char)c);
+		for (i = 0; i < (ptrdiff_t)current->num_states; i++) {
+			nfa_statelist_pushmatching(next, current->states[i], (char)c);
 		}
 		// trace_statelist("n", next);
 
@@ -135,20 +153,72 @@ off_t simulate(struct nfa_graph *graph, FILE *stream)
 	return -count;
 }
 
+struct mort_parser {
+	FILE *f;
+	struct tok_defn *tokens;
+	const char *filename;
+};
+
+struct token *get_next_token(struct mort_parser *p)
+{
+	struct token *t;
+	while (!feof(p->f) && !ferror(p->f)) {
+		int i, n;
+		long int off;
+		char c = fgetc(p->f);
+		if (c == EOF) {
+			break;
+		}
+		ungetc(c, p->f);
+		for (i = 0; i < NUM_TOKENS; i++) {
+			//fprintf(stderr, "Trying %s.\n", token_name(p->tokens[i].type));
+			n = simulate(p->tokens[i].pattern, p->f);
+			if (n > 0) {
+				long int m = ftell(p->f);
+				char *s = emalloc(n + 1);
+				struct token *t = emalloc(sizeof *t);
+
+				fseek(p->f, -n, SEEK_CUR);
+				fgets(s, n + 1, p->f);
+				*t = (struct token){.line = 0, .col = m, .filename = p->filename, .type = p->tokens[i].type, .string = s};
+				//fprintf(stderr, "Matched \"%s\" at [%ld:%ld) to token %s.\n", escapes(s), m - n, m, token_name(p->tokens[i].type));
+				return t;
+			}
+			fseek(p->f, n, SEEK_CUR);
+		}
+
+		off = ftell(p->f);
+		c = fgetc(p->f);
+		if (c != EOF) {
+			fprintf(stderr, "Cannot match %c at %ld to any token.\n", c, off);
+			return NULL;
+		}
+	}
+	t = emalloc(sizeof *t);
+	*t = (struct token){.line = 0, .col = -1, .filename = p->filename, .type = TOKEN_EOF, .string = ""};
+	return t;
+}
+
 int main(int argc, char **argv)
 {
-	int i, n;
-	FILE *f;
-	struct token_definition *tokens;
+	struct mort_parser p;
+	struct tok_tokenlist *list = tok_tokenlist_new();
+	char *procpath;
+	char filename[1024] = {0};
 
-	init_tokens(&tokens);
+	init_tokens(&p.tokens);
 
-	f = fopen("input.txt", "rb");
-	if (f == NULL) {
+	p.f = fopen("input.txt", "rb");
+	if (p.f == NULL) {
 		fprintf(stderr, "No such file\n");
 		return -1;
 	}
 
+	asprintf(&procpath, "/proc/self/fd/%d", fileno(p.f));
+	memset(filename, 0, sizeof(filename));
+	readlink(procpath, filename, sizeof(filename) - 1);
+	free(procpath);
+	p.filename = &filename[0];
 
 	// Algorithm:
 	// tokens = []
@@ -162,30 +232,10 @@ int main(int argc, char **argv)
 	//       jump back in stream by the number of characters seen by running the pattern
 	//   raise an error "could not match any token here"
 
-	while (!feof(f) && !ferror(f)) {
-		long int off;
-		char c = fgetc(f);
-		if (c == EOF) {
-			break;
-		}
-		ungetc(c, f);
-		for (i = 0; i < NUM_TOKENS; i++) {
-			fprintf(stderr, "Trying %s.\n", tokens[i].name);
-			n = simulate(tokens[i].pattern, f);
-			if (n > 0) {
-				fprintf(stderr, "Matched [%ld:%ld) to token %s.\n", ftell(f) - n, ftell(f), tokens[i].name);
-				goto loopend;
-			}
-			fseek(f, n, SEEK_CUR);
-		}
-		off = ftell(f);
-		c = fgetc(f);
-		if (c == EOF)
-			break;
-		else
-			fprintf(stderr, "Cannot match %c at %ld to any token.\n", c, off);
-		return -1;
-loopend:	;
+	while (!feof(p.f) && !ferror(p.f)) {
+		struct token *t = get_next_token(&p);
+		tok_tokenlist_push(list, t);
+		trace_tokenlist("t", list);
 	}
 
 	return 0;

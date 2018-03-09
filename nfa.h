@@ -12,26 +12,27 @@ struct nfa_state {
 	struct nfa_trans trans2;
 	const char *name; /* lifetime should be managed separately from this object */
 };
-struct nfa_graph *nfa_symbol(const char *valid);
-struct nfa_graph *nfa_string(const char *string);
-struct nfa_graph *nfa_keyword(const char *string);
-struct nfa_graph *nfa_word_boundary();
-struct nfa_graph *nfa_epsilon(void);
-struct nfa_graph *nfa_union(struct nfa_graph *s, struct nfa_graph *t);
-struct nfa_graph *nfa_concatenation(struct nfa_graph *s, struct nfa_graph *t);
-struct nfa_graph *nfa_kleene_star(struct nfa_graph *g);
+extern struct nfa_graph *nfa_no(void);
+extern struct nfa_graph *nfa_symbol(const char *valid);
+extern struct nfa_graph *nfa_string(const char *string);
+extern struct nfa_graph *nfa_keyword(const char *string);
+extern struct nfa_graph *nfa_word_boundary();
+extern struct nfa_graph *nfa_epsilon(void);
+extern struct nfa_graph *nfa_union(struct nfa_graph *s, struct nfa_graph *t);
+extern struct nfa_graph *nfa_concatenation(struct nfa_graph *s, struct nfa_graph *t);
+extern struct nfa_graph *nfa_kleene_star(struct nfa_graph *g);
 struct nfa_statelist {
 	struct nfa_state **states;
-	size_t num_states;
-	size_t capacity;
+	ptrdiff_t num_states;
+	ptrdiff_t capacity;
 };
-struct nfa_statelist *nfa_statelist_new(void);
-void nfa_statelist_push(struct nfa_statelist *, struct nfa_state *);
-void nfa_statelist_pushclosure(struct nfa_statelist *, struct nfa_state *);
-void nfa_statelist_pushmatching(struct nfa_statelist *, struct nfa_state *, char c);
-int nfa_statelist_contains(struct nfa_statelist *, struct nfa_state *);
-void nfa_statelist_expand(struct nfa_statelist *);
-void nfa_statelist_clear(struct nfa_statelist *);
+extern struct nfa_statelist *nfa_statelist_new(void);
+extern void nfa_statelist_push(struct nfa_statelist *, struct nfa_state *);
+extern void nfa_statelist_pushclosure(struct nfa_statelist *, struct nfa_state *);
+extern void nfa_statelist_pushmatching(struct nfa_statelist *, struct nfa_state *, char c);
+extern int nfa_statelist_contains(struct nfa_statelist *, struct nfa_state *);
+extern void nfa_statelist_expand(struct nfa_statelist *);
+extern void nfa_statelist_clear(struct nfa_statelist *);
 #define trace_statelist_abbrev(code, list)\
 	do {\
 		struct nfa_statelist *_l = (list);\
