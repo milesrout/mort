@@ -12,14 +12,13 @@ struct nfa_state {
 	struct nfa_trans trans2;
 	const char *name; /* lifetime should be managed separately from this object */
 };
-extern struct nfa_graph *nfa_phantom(void);
+extern struct nfa_graph *nfa_never(void);
+extern struct nfa_graph *nfa_anybut(const char *invalid);
 extern struct nfa_graph *nfa_symbol(const char *valid);
 extern struct nfa_graph *nfa_string(const char *string);
-extern struct nfa_graph *nfa_keyword(const char *string);
-extern struct nfa_graph *nfa_word_boundary();
 extern struct nfa_graph *nfa_epsilon(void);
 extern struct nfa_graph *nfa_union(struct nfa_graph *s, struct nfa_graph *t);
-extern struct nfa_graph *nfa_concatenation(struct nfa_graph *s, struct nfa_graph *t);
+extern struct nfa_graph *nfa_concat(struct nfa_graph *s, struct nfa_graph *t);
 extern struct nfa_graph *nfa_kleene_star(struct nfa_graph *g);
 struct nfa_statelist {
 	struct nfa_state **states;

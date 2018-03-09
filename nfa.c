@@ -61,23 +61,55 @@ _(const char *string)
 }
 
 struct nfa_graph *
-nfa_phantom(void)
+nfa_anybut(const char *invalid)
 {
 	struct nfa_state *f, *q;
 	struct nfa_graph *g;
 
 	f = emalloc(sizeof *f);
-	asprintf(&f->name, "(nil-f)");
+	asprintf(&f->name, "(always-f)");
 	f->trans1.endpoint = NULL;
+	f->trans1.valid = NULL;
 	f->trans2.endpoint = NULL;
+	f->trans2.valid = NULL;
 
 	q = emalloc(sizeof *q);
-	asprintf(&q->name, "(nil-q)");
+	asprintf(&q->name, "(always-q)");
 	q->trans1.endpoint = NULL;
-	q->trans2.endpoint = NULL;
+	q->trans1.valid = invalid;
+	q->trans2.endpoint = f;
+	q->trans2.valid = "";
 
 	g = emalloc(sizeof *g);
-	asprintf(&g->name, "(nil-g)");
+	asprintf(&g->name, "[^%s]", _(invalid));
+	g->initial_state = q;
+	g->final_state = f;
+
+	return g;
+}
+
+struct nfa_graph *
+nfa_never(void)
+{
+	struct nfa_state *f, *q;
+	struct nfa_graph *g;
+
+	f = emalloc(sizeof *f);
+	asprintf(&f->name, "nfa_never final");
+	f->trans1.endpoint = NULL;
+	f->trans1.valid = NULL;
+	f->trans2.endpoint = NULL;
+	f->trans2.valid = NULL;
+
+	q = emalloc(sizeof *q);
+	asprintf(&q->name, "nfa_never initial");
+	q->trans1.endpoint = NULL;
+	q->trans1.valid = NULL;
+	q->trans2.endpoint = NULL;
+	q->trans2.valid = NULL;
+
+	g = emalloc(sizeof *g);
+	asprintf(&g->name, "[^]");
 	g->initial_state = q;
 	g->final_state = f;
 
@@ -93,13 +125,16 @@ nfa_symbol(const char *valid)
 	f = emalloc(sizeof *f);
 	asprintf(&f->name, "nfa_symbol /[%s]/ final", _(valid));
 	f->trans1.endpoint = NULL;
+	f->trans1.valid = NULL;
 	f->trans2.endpoint = NULL;
+	f->trans2.valid = NULL;
 
 	q = emalloc(sizeof *q);
 	asprintf(&q->name, "nfa_symbol /[%s]/ initial", _(valid));
 	q->trans1.endpoint = f;
 	q->trans1.valid = valid;
 	q->trans2.endpoint = NULL;
+	q->trans2.valid = NULL;
 
 	graph = emalloc(sizeof *graph);
 	asprintf(&graph->name, "[%s]", _(valid));
@@ -123,7 +158,9 @@ nfa_string(const char *string)
 	state = emalloc(sizeof *state);
 	asprintf(&state->name, "nfa_string /%s/ initial", _(string));
 	state->trans1.endpoint = NULL;
+	state->trans1.valid = NULL;
 	state->trans2.endpoint = NULL;
+	state->trans2.valid = NULL;
 
 	graph = emalloc(sizeof *graph);
 	asprintf(&graph->name, "%s", _(string));
@@ -133,7 +170,9 @@ nfa_string(const char *string)
 		struct nfa_state *new = emalloc(sizeof *new);
 		asprintf(&new->name, "nfa_string /%s/ %d of %d", _(string), i, n);
 		new->trans1.endpoint = NULL;
+		new->trans1.valid = NULL;
 		new->trans2.endpoint = NULL;
+		new->trans2.valid = NULL;
 
 		state->trans1.endpoint = new;
 		state->trans1.valid = onechar(c);
@@ -143,31 +182,6 @@ nfa_string(const char *string)
 	}
 
 	graph->final_state = state;
-
-	return graph;
-}
-
-struct nfa_graph *
-nfa_word_boundary()
-{
-	struct nfa_graph *graph;
-	struct nfa_state *f, *q;
-
-	f = emalloc(sizeof *f);
-	f->name = "nfa_word_boundary final";
-	f->trans1.endpoint = NULL;
-	f->trans2.endpoint = NULL;
-
-	q = emalloc(sizeof *q);
-	q->name = "nfa_word_boundary initial";
-	q->trans1.endpoint = f;
-	q->trans1.valid = "";
-	q->trans2.endpoint = NULL;
-
-	graph = emalloc(sizeof *graph);
-	asprintf(&graph->name, "\\b");
-	graph->initial_state = q;
-	graph->final_state = f;
 
 	return graph;
 }
@@ -187,7 +201,9 @@ nfa_union(struct nfa_graph *s, struct nfa_graph *t)
 	f = emalloc(sizeof *f);
 	f->name = "nfa_union final";
 	f->trans1.endpoint = NULL;
+	f->trans1.valid = NULL;
 	f->trans2.endpoint = NULL;
+	f->trans2.valid = NULL;
 
 	q = emalloc(sizeof *q);
 	q->name = "nfa_union initial";
@@ -213,7 +229,7 @@ nfa_union(struct nfa_graph *s, struct nfa_graph *t)
 // Could instead record a list of state equations and set s_f = t_i
 // then use that information when converting to a DFA
 struct nfa_graph *
-nfa_concatenation(struct nfa_graph *s, struct nfa_graph *t)
+nfa_concat(struct nfa_graph *s, struct nfa_graph *t)
 {
 	struct nfa_graph *graph;
 
@@ -237,7 +253,9 @@ nfa_kleene_star(struct nfa_graph *g)
 	f = emalloc(sizeof *f);
 	f->name = "nfa_kleene_star final";
 	f->trans1.endpoint = NULL;
+	f->trans1.valid = NULL;
 	f->trans2.endpoint = NULL;
+	f->trans2.valid = NULL;
 
 	g->final_state->trans1.endpoint = g->initial_state;
 	g->final_state->trans1.valid = NULL;
@@ -257,13 +275,6 @@ nfa_kleene_star(struct nfa_graph *g)
 	graph->final_state = f;
 
 	return graph;
-}
-
-struct nfa_graph *
-nfa_keyword(const char *string)
-{
-	return nfa_concatenation(nfa_word_boundary(),
-	           nfa_concatenation(nfa_string(string), nfa_word_boundary()));
 }
 
 void
@@ -307,6 +318,11 @@ nfa_statelist_pushclosure(struct nfa_statelist *list, struct nfa_state *s)
 void
 nfa_statelist_pushmatching(struct nfa_statelist *list, struct nfa_state *s, char c)
 {
+	if (s->trans1.endpoint == NULL && s->trans2.endpoint != NULL && s->trans1.valid != NULL)
+		if (strchr(s->trans1.valid, c) == NULL)
+			if (!nfa_statelist_contains(list, s->trans2.endpoint))
+				nfa_statelist_pushclosure(list, s->trans2.endpoint);
+
 	if (s->trans1.endpoint != NULL && s->trans1.valid != NULL)
 		if (strchr(s->trans1.valid, c) != NULL)
 			if (!nfa_statelist_contains(list, s->trans1.endpoint))

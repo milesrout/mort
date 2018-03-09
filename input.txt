@@ -1,1 +1,17 @@
-([]){}hello
+static
+struct token *
+get_token(struct mort_parser *p)
+{
+	struct token *t;
+
+	printf("Hello, %d!\n", 100);
+
+	while (t = get_next_token(p)) {
+		switch (t->type) {
+			case TOKEN_NEWLINE:
+				continue;
+			default:
+				return t;
+		}
+	}
+}
