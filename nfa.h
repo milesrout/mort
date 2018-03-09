@@ -12,7 +12,7 @@ struct nfa_state {
 	struct nfa_trans trans2;
 	const char *name; /* lifetime should be managed separately from this object */
 };
-extern struct nfa_graph *nfa_no(void);
+extern struct nfa_graph *nfa_phantom(void);
 extern struct nfa_graph *nfa_symbol(const char *valid);
 extern struct nfa_graph *nfa_string(const char *string);
 extern struct nfa_graph *nfa_keyword(const char *string);

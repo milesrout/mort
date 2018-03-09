@@ -61,7 +61,7 @@ _(const char *string)
 }
 
 struct nfa_graph *
-nfa_no(void)
+nfa_phantom(void)
 {
 	struct nfa_state *f, *q;
 	struct nfa_graph *g;

@@ -20,24 +20,27 @@
 const char *alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
 const char *alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 
+#define DEFINE(tok, expr) tokens[tok] = (struct tok_defn){tok, expr}
 void init_tokens(struct tok_defn **_tokens)
 {
 	struct tok_defn *tokens = emalloc(NUM_TOKENS * (sizeof *tokens));
-	tokens[TOKEN_EOF]     = (struct tok_defn){TOKEN_EOF,     nfa_no()};
-	tokens[TOKEN_LPAREN]  = (struct tok_defn){TOKEN_LPAREN,  nfa_symbol("(")};
-	tokens[TOKEN_RPAREN]  = (struct tok_defn){TOKEN_RPAREN,  nfa_symbol(")")};
-	tokens[TOKEN_LBRACE]  = (struct tok_defn){TOKEN_LBRACE,  nfa_symbol("{")};
-	tokens[TOKEN_RBRACE]  = (struct tok_defn){TOKEN_RBRACE,  nfa_symbol("}")};
-	tokens[TOKEN_LBRACK]  = (struct tok_defn){TOKEN_LBRACK,  nfa_symbol("[")};
-	tokens[TOKEN_RBRACK]  = (struct tok_defn){TOKEN_RBRACK,  nfa_symbol("]")};
-	tokens[TOKEN_NEWLINE] = (struct tok_defn){TOKEN_NEWLINE, nfa_symbol("\n")};
-	tokens[TOKEN_IF]      = (struct tok_defn){TOKEN_IF,      nfa_string("if")};
-	tokens[TOKEN_ELSE]    = (struct tok_defn){TOKEN_ELSE,    nfa_string("else")};
-	tokens[TOKEN_RETURN]  = (struct tok_defn){TOKEN_RETURN,  nfa_string("return")};
-	tokens[TOKEN_IDENT]   = (struct tok_defn){TOKEN_IDENT,   nfa_concatenation(nfa_symbol(alpha), nfa_kleene_star(nfa_symbol(alnum)))};
+
+	DEFINE(TOKEN_EOF,     nfa_phantom());
+	DEFINE(TOKEN_LPAREN,  nfa_symbol("("));
+	DEFINE(TOKEN_RPAREN,  nfa_symbol(")"));
+	DEFINE(TOKEN_LBRACE,  nfa_symbol("{"));
+	DEFINE(TOKEN_RBRACE,  nfa_symbol("}"));
+	DEFINE(TOKEN_LBRACK,  nfa_symbol("["));
+	DEFINE(TOKEN_RBRACK,  nfa_symbol("]"));
+	DEFINE(TOKEN_NEWLINE, nfa_symbol("\n"));
+	DEFINE(TOKEN_IF,      nfa_string("if"));
+	DEFINE(TOKEN_ELSE,    nfa_string("else"));
+	DEFINE(TOKEN_RETURN,  nfa_string("return"));
+	DEFINE(TOKEN_IDENT,   nfa_concatenation(nfa_symbol(alpha), nfa_kleene_star(nfa_symbol(alnum))));
 
 	*_tokens = tokens;
 }
+#undef DEFINE
 
 static char *onechar(char c)
 {
