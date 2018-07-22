@@ -40,7 +40,7 @@ void init_tokens(struct tok_defn **_tokens)
 	struct nfa_graph *universal_character_name =
 	    nfa_union(
 	        nfa_concat(nfa_symbol("u"), hex_quad()),
-	        nfa_concat(nfa_symbol("u"), nfa_concat(hex_quad(), hex_quad())));
+	        nfa_concat(nfa_symbol("U"), nfa_concat(hex_quad(), hex_quad())));
 	struct nfa_graph *octal_escape_sequence =
 	    nfa_union(
 	        octal_digit(),
